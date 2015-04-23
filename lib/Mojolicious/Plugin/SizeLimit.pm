@@ -227,10 +227,12 @@ this option is all one needs, because it only kills off processes that
 are truly using too much physical RAM, allowing most processes to live
 longer and reducing the process churn rate.
 
+On Solaris though unshared size is not available.
+
 =head2 max_process_size
 
 The maximum size of the process in KB, including both shared and
-unshared memory.
+unshared memory. This must be used on Solaris.
 
 =head2 min_shared_size
 

@@ -90,8 +90,8 @@ ok $tx->keep_alive,  'connection will be kept alive';
 ok $tx->kept_alive,  'connection was kept alive';
 is $tx->res->code, 200, 'right status';
 my ($size1, $shared1) = split ' ', $tx->res->body;
-like $size1, qr/^\d+$/, 'size is a positive integer';
-like $shared1, qr/^\d+$/, 'shared is a positive integer';
+like $size1, qr/^\d+$/, 'size is a non-negative integer';
+like $shared1, qr/^\d+$/, 'shared is a non-negative integer';
 
 # Grow process and get process size again
 $tx = $ua->get("http://127.0.0.1:$port/size?inc=1000000");
@@ -100,14 +100,24 @@ ok $tx->keep_alive,  'connection will be kept alive';
 ok $tx->kept_alive,  'connection was kept alive';
 is $tx->res->code, 200, 'right status';
 my ($size2, $shared2) = split ' ', $tx->res->body;
-like $size2, qr/^\d+$/, 'size is a positive integer';
-like $shared2, qr/^\d+$/, 'shared is a positive integer';
+like $size2, qr/^\d+$/, 'size is a non-negative integer';
+like $shared2, qr/^\d+$/, 'shared is a non-negative integer';
 my $msize = int(($size1 + $size2) / 2 + 1);
 my $mshared= int(($shared1 + $shared2) / 2 + 1);
-my $munshared = $msize - $mshared;
+my ($p, $v);
+
+if ($shared1) {
+    $p = 'max_unshared_size';
+    $v = ($msize - $mshared);
+}
+else {
+    # no information available for shared (Solaris)
+    $p = 'max_process_size';
+    $v = $msize;
+}
 
 # Update script
-spurt sprintf($tmpl, "max_unshared_size => $munshared"), $script;
+spurt sprintf($tmpl, "$p => $v"), $script;
 
 open my $hot_deploy1, '-|', 'hypnotoad', $script;
 
@@ -147,8 +157,8 @@ ok !$tx->keep_alive,  'connection will not be kept alive';
 ok $tx->kept_alive,  'connection was kept alive';
 is $tx->res->code, 200, 'right status';
 my ($size3, $shared3) = split ' ', $tx->res->body;
-like $size3, qr/^\d+$/, 'size is a positive integer';
-like $shared3, qr/^\d+$/, 'shared is a positive integer';
+like $size3, qr/^\d+$/, 'size is a non-negative integer';
+like $shared3, qr/^\d+$/, 'shared is a non-negative integer';
 
 # This must be a fresh worker process
 $tx = $ua->get("http://127.0.0.1:$port/pid");
@@ -161,7 +171,7 @@ like $wpid3, qr/^\d+$/, 'right content';
 isnt $wpid3, $wpid2, 'worker pid changed again';
 
 # Update script again
-spurt sprintf($tmpl, "max_unshared_size => $munshared, check_interval => 3"),
+spurt sprintf($tmpl, "$p => $v, check_interval => 3"),
       $script;
 
 open my $hot_deploy2, '-|', 'hypnotoad', $script;
@@ -237,7 +247,7 @@ like $log, qr/
         .+
         Worker\s+$wpid1\s+stopped
         .+
-        Unshared\s+size\s+\(\d+\s+K\)\s+exceeds\s+max_unshared_size\s+\($munshared\s+K\)
+        (?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
         .+
         Worker\s+$wpid2\s+stopped
         .+
@@ -255,7 +265,7 @@ like $log, qr/
         .+
         Worker\s+$wpid3\s+stopped
         .+
-        Unshared\s+size\s+\(\d+\s+K\)\s+exceeds\s+max_unshared_size\s+\($munshared\s+K\)
+        (?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
         .+
         Worker\s+$wpid4\s+stopped
         .+

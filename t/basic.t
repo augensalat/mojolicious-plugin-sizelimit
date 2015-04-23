@@ -4,7 +4,22 @@ use Test::More;
 use Mojolicious::Lite;
 use Test::Mojo;
 
-plugin 'SizeLimit', max_unshared_size => 16384, check_interval => 2;
+require Mojolicious::Plugin::SizeLimit;
+
+my ($total, $shared) = Mojolicious::Plugin::SizeLimit::check_size();
+my ($p, $v);
+
+if ($shared) {
+    $p = 'max_unshared_size';
+    $v = int(($total - $shared) / 2);
+}
+else {
+    # no information available for shared (Solaris)
+    $p = 'max_process_size';
+    $v = int($total / 2);
+}
+
+plugin 'SizeLimit', $p => $v, check_interval => 2;
 
 get '/' => sub {
   my $c = shift;
