@@ -4,10 +4,11 @@ BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll' }
 
 use Test::More;
 
-plan skip_all => 'set TEST_HYPNOTOAD to enable this test (developer only!)'
-  unless $ENV{TEST_HYPNOTOAD};
+plan skip_all => <<'' unless $ENV{TEST_HYPNOTOAD} or $ENV{TEST_HYPNOTOAD_PATH};
+set TEST_HYPNOTOAD or TEST_HYPNOTOAD_PATH to enable this test (developer only!)
 
-use File::Spec::Functions 'catdir';
+use Config;
+use File::Spec::Functions qw(catdir catfile);
 use File::Temp 'tempdir';
 use FindBin;
 use IO::Socket::INET;
@@ -18,6 +19,12 @@ use Mojo::Util qw(slurp spurt);
 
 
 # Prepare script
+my $perl = $Config{perlpath};
+my $hypnotoad = $ENV{TEST_HYPNOTOAD_PATH} || catfile $Config{bin}, 'hypnotoad';
+
+plan skip_all => <<"" unless -e $hypnotoad;
+No hypnotoad found at $hypnotoad. Set TEST_HYPNOTOAD_PATH to correct path.
+
 my $dir = tempdir CLEANUP => 1;
 my $script = catdir $dir, 'myapp.pl';
 my $log    = catdir $dir, 'mojo.log';
@@ -60,7 +67,7 @@ EOF
 spurt sprintf($tmpl, ''), $script;
 
 # Start
-open my $start, '-|', 'hypnotoad', $script;
+open my $start, '-|', $perl, $hypnotoad, $script;
 sleep 3;
 sleep 1 while !_port($port);
 my $mpid1 = _pid();
@@ -119,7 +126,7 @@ else {
 # Update script
 spurt sprintf($tmpl, "$p => $v"), $script;
 
-open my $hot_deploy1, '-|', 'hypnotoad', $script;
+open my $hot_deploy1, '-|', $perl, $hypnotoad, $script;
 
 # Connection did not get lost
 $tx = $ua->get("http://127.0.0.1:$port/pid");
@@ -174,7 +181,7 @@ isnt $wpid3, $wpid2, 'worker pid changed again';
 spurt sprintf($tmpl, "$p => $v, check_interval => 3"),
       $script;
 
-open my $hot_deploy2, '-|', 'hypnotoad', $script;
+open my $hot_deploy2, '-|', $perl, $hypnotoad, $script;
 
 # Remove keep-alive connections
 $ua = Mojo::UserAgent->new;
@@ -225,7 +232,7 @@ like $wpid5, qr/^\d+$/, 'right content';
 isnt $wpid5, $wpid4, 'worker pid changed again';
 
 # Stop
-open my $stop, '-|', 'hypnotoad', $script, '-s';
+open my $stop, '-|', $perl, $hypnotoad, $script, '-s';
 sleep 1 while _port($port);
 
 # Check log
@@ -277,10 +284,10 @@ like $log, qr/
     /sx, 'log is correct';
 
 sub _pid {
-  return undef unless open my $file, '<', catdir($dir, 'hypnotoad.pid');
-  my $pid = <$file>;
-  chomp $pid;
-  return $pid;
+    return undef unless open my $file, '<', catdir($dir, 'hypnotoad.pid');
+    my $pid = <$file>;
+    chomp $pid;
+    return $pid;
 }
 
 sub _port {
