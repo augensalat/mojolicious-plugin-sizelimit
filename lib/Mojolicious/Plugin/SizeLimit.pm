@@ -4,7 +4,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::IOLoop;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 my $PKG = __PACKAGE__;
 
@@ -168,11 +168,11 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::SizeLimit - Kill Your Children If They Grow Too Large
+Mojolicious::Plugin::SizeLimit - Terminate workers that grow too large
 
 =head1 VERSION
 
-Version 0.001
+Version 0.002
 
 =head1 SYNOPSIS
 
@@ -196,9 +196,9 @@ a minimum limit on shared memory, or a maximum on unshared memory.
 Actually, there are two big reasons your L<hypnotoad> workers will grow.
 First, your code could have a bug that causes the process to increase in
 size very quickly. Second, you could just be doing operations that
-require a lot of memory for each request. Since Perl does not give
-memory back to the system after using it, the process size can grow
-quite large.
+require a lot of memory for each request. Since you can't rely that
+Perl gives memory back to the system after using it, the process size
+can grow quite large.
 
 This module will not really help you with the first problem. For that
 you should probably look into "BSD::Resource" or some other means of
@@ -208,7 +208,10 @@ it is a little violent, terminating your process in mid-request.
 
 This module attempts to solve the second situation, where your process
 slowly grows over time. It checks memory usage after every N requests,
-and if it exceeds a threshold, exits gracefully.
+and if it exceeds a threshold, calls L<Mojo::IOLoop/stop_gracefully>,
+what as a result makes the worker stop accepting new connections and
+terminate as soon as all its pending requests have been processed and
+served.
 
 By using this module, you should be able to set the configuration
 directive L<Mojo::Server::Hypnotoad/accepts> to 0 (= unlimited).
@@ -223,7 +226,7 @@ L<Mojolicious::Plugin::SizeLimit> supports the following options.
 =head2 max_unshared_size
 
 The maximum amount of unshared memory the process can use in KB. Usually
-this option is all one needs, because it only kills off processes that
+this option is all one needs, because it only terminates processes that
 are truly using too much physical RAM, allowing most processes to live
 longer and reducing the process churn rate.
 
