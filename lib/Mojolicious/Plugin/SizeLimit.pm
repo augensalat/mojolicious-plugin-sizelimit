@@ -86,7 +86,7 @@ sub _linux_size_check {
         close $fh;
     }
     else {
-        $_[0]->log->error("Couldn't access /proc/self/status");
+        $_[0]->log->error("Couldn't access /proc/self/statm");
     }
 
     # linux on intel x86 has 4KB page size...
