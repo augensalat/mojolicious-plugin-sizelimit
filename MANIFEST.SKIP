@@ -1,5 +1,7 @@
 ^\.(?!perltidyrc)
 .*\.old$
+\..*\.sw.$
+~$
 \.tar\.gz$
 ^Makefile$
 ^MANIFEST\.bak
