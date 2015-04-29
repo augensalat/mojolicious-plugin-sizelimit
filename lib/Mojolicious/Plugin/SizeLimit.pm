@@ -4,7 +4,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::IOLoop;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 my $PKG = __PACKAGE__;
 
@@ -196,7 +196,7 @@ Mojolicious::Plugin::SizeLimit - Terminate workers that grow too large
 
 =head1 VERSION
 
-Version 0.002
+Version 0.003
 
 =head1 SYNOPSIS
 

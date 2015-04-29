@@ -27,7 +27,7 @@ else {
 my @args = (
     NAME           => 'Mojolicious::Plugin::SizeLimit',
     VERSION_FROM   => 'lib/Mojolicious/Plugin/SizeLimit.pm',
-    ABSTRACT       => 'Kill Your Children If They Grow Too Large',
+    ABSTRACT       => 'Terminate workers that grow too large',
     AUTHOR         => 'Bernhard Graf <graf@cpan.org>',
     LICENSE        => 'artistic_2',
     test           => {TESTS => 't/*.t'}
