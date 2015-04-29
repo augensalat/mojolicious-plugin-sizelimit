@@ -4,6 +4,7 @@ Revision history for Mojolicious-Plugin-SizeLimit
         - Improve documentation.
         - Fix error message.
         - Add verboser test output in failure case.
+        - Add attribute report_level.
 
 0.001   2015-04-23
         First version, released on an unsuspecting world.

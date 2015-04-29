@@ -124,7 +124,7 @@ else {
 }
 
 # Update script
-spurt sprintf($tmpl, "$p => $v"), $script;
+spurt sprintf($tmpl, "$p => $v, report_level => 'info'"), $script;
 
 open my $hot_deploy1, '-|', $perl, $hypnotoad, $script;
 
@@ -178,7 +178,7 @@ like $wpid3, qr/^\d+$/, 'right content';
 isnt $wpid3, $wpid2, 'worker pid changed again';
 
 # Update script again
-spurt sprintf($tmpl, "$p => $v, check_interval => 3"),
+spurt sprintf($tmpl, "$p => $v, check_interval => 3, report_level => 'warn'"),
       $script;
 
 open my $hot_deploy2, '-|', $perl, $hypnotoad, $script;
@@ -254,7 +254,7 @@ like $log, qr/
         .+
         Worker\s+$wpid1\s+stopped
         .+
-        (?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
+        \[info\]\s+(?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
         .+
         Worker\s+$wpid2\s+stopped
         .+
@@ -272,7 +272,7 @@ like $log, qr/
         .+
         Worker\s+$wpid3\s+stopped
         .+
-        (?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
+        \[warn\]\s+(?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
         .+
         Worker\s+$wpid4\s+stopped
         .+

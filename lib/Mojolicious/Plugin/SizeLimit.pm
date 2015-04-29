@@ -36,11 +36,14 @@ else {
 
 sub register {
     my ($self, $app, $conf) = @_;
+    my %conf = %$conf;
+
+    $conf{report_level} = 'debug' unless exists $conf->{report_level};
 
     # ... a sub that is true every $check_interval requests
-    *_is_nth_request = _make_is_nth_request($conf);
+    *_is_nth_request = _make_is_nth_request(\%$conf);
     # ... a sub that is true if memory consumption exceeds conf values
-    *_limits_are_exceeded = _make_limits_are_exceeded($conf);
+    *_limits_are_exceeded = _make_limits_are_exceeded(\%conf);
 
     $app->hook(after_dispatch => sub {
         _is_nth_request() and _limits_are_exceeded($app)
@@ -116,33 +119,54 @@ _SUB_
 
 sub _make_limits_are_exceeded {
     my $conf = shift;
+    my $report = $conf->{report_level};
+    my $format = $report ? qq{\$app->log->$report("%s");} : '';
+    my ($l, $s);
+
     my $sub = <<'_SUB_';
         sub {
             my $app = shift;
             my ($size, $shared) = check_size($app);
 _SUB_
-    $sub .= <<"_SUB_" if $conf->{max_process_size};
-            if (\$size > $conf->{max_process_size}) {
-                \$app->log->debug("Process size (\$size K) exceeds max_process_size ($conf->{max_process_size} K)");
+
+    if ($s = $conf->{max_process_size}) {
+        $l = sprintf $format,
+                "Process size (\$size K) exceeds max_process_size ($s K)";
+        $sub .= <<"_SUB_";
+            if (\$size > $s) {
+                $l
                 return 1;
             }
 _SUB_
-    $sub .= <<'_SUB_';
+    }
+
+        $sub .= <<'_SUB_';
             return 0 unless $shared;
 _SUB_
-    $sub .= <<"_SUB_" if $conf->{min_shared_size};
-            if (\$shared < $conf->{min_shared_size}) {
-                \$app->log->debug("Shared size (\$shared K) underruns min_shared_size ($conf->{min_shared_size} K)");
+
+    if ($s = $conf->{min_shared_size}) {
+        $l = sprintf $format,
+                "Shared size (\$shared K) underruns min_shared_size ($s K)";
+        $sub .= <<"_SUB_";
+            if (\$shared < $s) {
+                $l
                 return 1;
             }
 _SUB_
-    $sub .= <<"_SUB_" if $conf->{max_unshared_size};
+    }
+
+    if ($s = $conf->{max_unshared_size}) {
+        $l = sprintf $format,
+                "Unshared size (\$unshared K) exceeds max_unshared_size ($s K)";
+        $sub .= <<"_SUB_";
             my \$unshared = \$size - \$shared;
-            if (\$unshared > $conf->{max_unshared_size}) {
-                \$app->log->debug("Unshared size (\$unshared K) exceeds max_unshared_size ($conf->{max_unshared_size} K)");
+            if (\$unshared > $s) {
+                $l
                 return 1;
             }
 _SUB_
+    }
+
     $sub .= <<'_SUB_';
             return 0;
         };
@@ -246,6 +270,16 @@ Sets the minimum amount of shared memory the process must have in KB.
 Since checking the process size can take a few system calls on some
 platforms (e.g. linux), you may specify this option to check the process
 size every N requests.
+
+=head2 report_level
+
+This plugin writes a message when a worker is about to terminate after
+reaching a limit. The message is written using the L<Mojo::Log> method
+given by C<report_level>, so any value documented in L<Mojo::Log/level>
+is acceptable, C<undef> disables the message. The default is C<"debug">.
+
+You might want to set C<report_level> at least to C<"info"> if you want
+this message in your production log.
 
 =head1 METHODS
 

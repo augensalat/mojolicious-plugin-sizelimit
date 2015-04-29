@@ -19,7 +19,7 @@ else {
     $v = int($total / 2);
 }
 
-plugin 'SizeLimit', $p => $v, check_interval => 2;
+plugin 'SizeLimit', $p => $v, check_interval => 2, report_level => 'info';
 
 get '/' => sub {
   my $c = shift;
