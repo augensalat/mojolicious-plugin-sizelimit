@@ -40,7 +40,14 @@ ok !$t->ua->ioloop->is_running, "IOLoop is running";
 $t->get_ok('/')
     ->status_is(200)
     ->content_is($$)
-    ->header_is(Connection => 'close');
+    ->header_is(Connection => 'close')
+    ->or(
+        sub {
+            my ($size, $shared) = Mojolicious::Plugin::SizeLimit::check_size($t->app);
+            diag "plugin 'SizeLimit', $p => '$v', check_interval => 2;";
+            diag "current size = $size, shared = $shared";
+        }
+    );
 
 ok !$t->ua->ioloop->is_running, "IOLoop is stopped";
 
