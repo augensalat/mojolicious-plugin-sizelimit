@@ -3,8 +3,11 @@ package Mojolicious::Plugin::SizeLimit;
 use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::IOLoop;
+use Time::HiRes ();
 
 our $VERSION = '0.003';
+
+our $LifeTime;
 
 my $PKG = __PACKAGE__;
 
@@ -41,12 +44,16 @@ sub register {
     $conf{report_level} = 'debug' unless exists $conf->{report_level};
 
     # ... a sub that is true every $check_interval requests
-    *_is_nth_request = _make_is_nth_request(\%$conf);
+    *_count_requests = _make_count_requests(\%$conf);
     # ... a sub that is true if memory consumption exceeds conf values
     *_limits_are_exceeded = _make_limits_are_exceeded(\%conf);
 
+    Mojo::IOLoop->singleton->next_tick(sub { $LifeTime = Time::HiRes::time })
+        if $conf{report_level};
+
     $app->hook(after_dispatch => sub {
-        _is_nth_request() and _limits_are_exceeded($app)
+        my ($count, $check) = _count_requests();
+        $check and _limits_are_exceeded($app, $count)
             or return;
 
         shift->res->headers->connection('close');
@@ -103,16 +110,16 @@ sub _load {
         or die "You must install $mod for $PKG to work on your platform.";
 }
 
-sub _make_is_nth_request {
+sub _make_count_requests {
     my $conf = shift;
 
-    return sub { 1 }
+    return sub { state $count = 0; return (++$count, 1) }
         if ($conf->{check_interval} // 1) == 1;
 
     return eval <<"_SUB_";
         sub {
             state \$count = 0;
-            return ++\$count % $conf->{check_interval} == 0;
+            return (\$count, ++\$count % $conf->{check_interval} == 0);
         };
 _SUB_
 }
@@ -120,56 +127,55 @@ _SUB_
 sub _make_limits_are_exceeded {
     my $conf = shift;
     my $report = $conf->{report_level};
-    my $format = $report ? qq{\$app->log->$report("%s");} : '';
-    my ($l, $s);
+    my ($f, $s);
+
+    if ($report) {
+        $f = q{_report($app, $count, $size, $shared, '%s')};
+        eval <<"_SUB_";
+sub _report {
+    my (\$app, \$count, \$size, \$shared, \$s) = \@_;
+    my \$m = "SizeLimit: Exceeding limit \$s KB. PID = \$\$, SIZE = \$size KB";
+    \$m .= ", SHARED = \$shared KB, UNSHARED = " . (\$size - \$shared) . " KB"
+        if \$shared;
+    \$m .= sprintf ", REQUESTS = %u, LIFETIME = %5.3f s",
+                    \$count, Time::HiRes::time - \$LifeTime;
+    \$app->log->$report(\$m);
+    return 1;
+}
+_SUB_
+    }
+    else {
+        $f = '1';
+    }
 
     my $sub = <<'_SUB_';
-        sub {
-            my $app = shift;
-            my ($size, $shared) = check_size($app);
+sub {
+    my ($app, $count) = @_;
+    my ($size, $shared) = check_size($app);
 _SUB_
 
     if ($s = $conf->{max_process_size}) {
-        $l = sprintf $format,
-                "Process size (\$size K) exceeds max_process_size ($s K)";
-        $sub .= <<"_SUB_";
-            if (\$size > $s) {
-                $l
-                return 1;
-            }
-_SUB_
-    }
-
-        $sub .= <<'_SUB_';
-            return 0 unless $shared;
-_SUB_
-
-    if ($s = $conf->{min_shared_size}) {
-        $l = sprintf $format,
-                "Shared size (\$shared K) underruns min_shared_size ($s K)";
-        $sub .= <<"_SUB_";
-            if (\$shared < $s) {
-                $l
-                return 1;
-            }
-_SUB_
-    }
-
-    if ($s = $conf->{max_unshared_size}) {
-        $l = sprintf $format,
-                "Unshared size (\$unshared K) exceeds max_unshared_size ($s K)";
-        $sub .= <<"_SUB_";
-            my \$unshared = \$size - \$shared;
-            if (\$unshared > $s) {
-                $l
-                return 1;
-            }
-_SUB_
+        $sub .= '    return ' . sprintf($f, "max_process_size = $s") .
+                " if \$size > $s;\n";
     }
 
     $sub .= <<'_SUB_';
-            return 0;
-        };
+    return 0 unless $shared;
+_SUB_
+
+    if ($s = $conf->{min_shared_size}) {
+        $sub .= '    return ' . sprintf($f, "min_shared_size = $s") .
+                " if \$shared < $s;\n";
+    }
+
+    if ($s = $conf->{max_unshared_size}) {
+        $sub .= '    return ' . sprintf($f, "max_unshared_size = $s") .
+                " if \$size - \$shared > $s;\n";
+    }
+
+    $sub .= <<'_SUB_';
+    return 0;
+};
 _SUB_
 
     return eval $sub;

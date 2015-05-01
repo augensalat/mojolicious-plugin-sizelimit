@@ -2,6 +2,7 @@ Revision history for Mojolicious-Plugin-SizeLimit
 
 0.003   2015-04-29
         - Fix abstract.
+        - Better diagnostics w/ memory usage, pid and process lifetime.
 
 0.002   2015-04-29
         - Improve documentation.

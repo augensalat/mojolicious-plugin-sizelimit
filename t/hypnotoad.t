@@ -254,7 +254,15 @@ like $log, qr/
         .+
         Worker\s+$wpid1\s+stopped
         .+
-        \[info\]\s+(?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
+        \[info\]\s+SizeLimit\:\s+Exceeding\s+limit\s+$p\s+=\s+$v\s+KB\.\s+
+            PID\s+=\s+\d+,\s+
+            SIZE\s+=\s+\d+\s+KB,\s+
+            (?:
+                SHARED\s+=\s+\d+\s+KB,\s+
+                UNSHARED\s+=\s+\d+\s+KB,\s+
+            )?
+            REQUESTS\s+=\s+\d+,\s+
+            LIFETIME\s+=\s+\d+\.\d+\s+s
         .+
         Worker\s+$wpid2\s+stopped
         .+
@@ -272,7 +280,15 @@ like $log, qr/
         .+
         Worker\s+$wpid3\s+stopped
         .+
-        \[warn\]\s+(?:Process|Unshared)\s+size\s+\(\d+\s+K\)\s+exceeds\s+$p\s+\($v\s+K\)
+        \[warn\]\s+SizeLimit\:\s+Exceeding\s+limit\s+$p\s+=\s+$v\s+KB\.\s+
+            PID\s+=\s+\d+,\s+
+            SIZE\s+=\s+\d+\s+KB,\s+
+            (?:
+                SHARED\s+=\s+\d+\s+KB,\s+
+                UNSHARED\s+=\s+\d+\s+KB,\s+
+            )?
+            REQUESTS\s+=\s+\d+,\s+
+            LIFETIME\s+=\s+\d+\.\d+\s+s
         .+
         Worker\s+$wpid4\s+stopped
         .+
