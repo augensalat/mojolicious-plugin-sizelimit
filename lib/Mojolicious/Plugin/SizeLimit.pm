@@ -39,6 +39,11 @@ else {
 
 sub register {
     my ($self, $app, $conf) = @_;
+    my ($total) = check_size($app);
+
+    die "OS ($^O) not supported by $PKG: Can not determine memory usage.\n"
+        unless $total;
+
     my %conf = %$conf;
 
     $conf{report_level} = 'debug' unless exists $conf->{report_level};

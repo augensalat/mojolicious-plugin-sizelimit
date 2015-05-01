@@ -17,6 +17,14 @@ use Mojo::Server::Hypnotoad;
 use Mojo::UserAgent;
 use Mojo::Util qw(slurp spurt);
 
+require Mojolicious::Plugin::SizeLimit;
+
+my ($total, $shared) = Mojolicious::Plugin::SizeLimit::check_size();
+
+unless (ok $total, "OS ($^O) is supported") {
+    done_testing();
+    exit 0;
+}
 
 # Prepare script
 my $perl = $Config{perlpath};

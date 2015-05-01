@@ -7,6 +7,12 @@ use Test::Mojo;
 require Mojolicious::Plugin::SizeLimit;
 
 my ($total, $shared) = Mojolicious::Plugin::SizeLimit::check_size();
+
+unless (ok $total, "OS ($^O) is supported") {
+    done_testing();
+    exit 0;
+}
+
 my ($p, $v);
 
 if ($shared) {
