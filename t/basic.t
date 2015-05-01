@@ -1,6 +1,7 @@
 use Mojo::Base -strict;
 
 use Test::More;
+use Mojo::IOLoop;
 use Mojolicious::Lite;
 use Test::Mojo;
 
@@ -34,14 +35,18 @@ get '/' => sub {
 
 my $t = Test::Mojo->new;
 
-ok !$t->ua->ioloop->is_running, "IOLoop is running";
+my $stopped = 0;
+
+Mojo::IOLoop->singleton->on(finish => sub { $stopped = 1 });
+
+ok !$stopped, "worker is alive";
 
 $t->get_ok('/')
     ->status_is(200)
     ->content_is($$)
     ->header_is(Connection => 'keep-alive');
 
-ok !$t->ua->ioloop->is_running, "IOLoop is running";
+ok !$stopped, "worker is alive";
 
 $t->get_ok('/')
     ->status_is(200)
@@ -55,6 +60,6 @@ $t->get_ok('/')
         }
     );
 
-ok !$t->ua->ioloop->is_running, "IOLoop is stopped";
+ok $stopped, "worker is stopped";
 
 done_testing();
