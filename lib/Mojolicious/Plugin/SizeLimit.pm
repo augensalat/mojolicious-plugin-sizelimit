@@ -39,7 +39,7 @@ else {
 
 sub register {
     my ($self, $app, $conf) = @_;
-    my ($total) = check_size($app);
+    my ($total) = check_size($app->log);
 
     die "OS ($^O) not supported by $PKG: Can not determine memory usage.\n"
         unless $total;
@@ -57,11 +57,12 @@ sub register {
         if $conf{report_level};
 
     $app->hook(after_dispatch => sub {
+        my $c = shift;
         my ($count, $check) = _count_requests();
-        $check and _limits_are_exceeded($app, $count)
+        $check and _limits_are_exceeded($c->app->log, $count)
             or return;
 
-        shift->res->headers->connection('close');
+        $c->res->headers->connection('close');
         Mojo::IOLoop->singleton->stop_gracefully;
     });
 }
@@ -101,7 +102,7 @@ sub _linux_size_check {
         close $fh;
     }
     else {
-        $_[0]->log->error("Couldn't access /proc/self/statm");
+        $_[0]->error("Couldn't access /proc/self/statm");
     }
 
     # linux on intel x86 has 4KB page size...
@@ -135,16 +136,16 @@ sub _make_limits_are_exceeded {
     my ($f, $s);
 
     if ($report) {
-        $f = q{_report($app, $count, $size, $shared, '%s')};
+        $f = q{_report($log, $count, $size, $shared, '%s')};
         eval <<"_SUB_";
 sub _report {
-    my (\$app, \$count, \$size, \$shared, \$s) = \@_;
+    my (\$log, \$count, \$size, \$shared, \$s) = \@_;
     my \$m = "SizeLimit: Exceeding limit \$s KB. PID = \$\$, SIZE = \$size KB";
     \$m .= ", SHARED = \$shared KB, UNSHARED = " . (\$size - \$shared) . " KB"
         if \$shared;
     \$m .= sprintf ", REQUESTS = %u, LIFETIME = %5.3f s",
                     \$count, Time::HiRes::time - \$LifeTime;
-    \$app->log->$report(\$m);
+    \$log->$report(\$m);
     return 1;
 }
 _SUB_
@@ -155,8 +156,8 @@ _SUB_
 
     my $sub = <<'_SUB_';
 sub {
-    my ($app, $count) = @_;
-    my ($size, $shared) = check_size($app);
+    my ($log, $count) = @_;
+    my ($size, $shared) = check_size($log);
 _SUB_
 
     if ($s = $conf->{max_process_size}) {
@@ -188,11 +189,10 @@ _SUB_
 
 sub _solaris_size_check {
     my $size = -s '/proc/self/as'
-        or $_[0]->log->error("/proc/self/as doesn't exist or is empty");
-    $size = int($size / 1024);
+        or $_[0]->error("/proc/self/as doesn't exist or is empty");
 
-    # return 0 for share, to avoid undef warnings
-    return ($size, 0);
+    # Convert size from B to KB. Return 0 for share to avoid undef warnings.
+    return (int($size / 1024), 0);
 }
 
 1;
