@@ -19,6 +19,9 @@ elsif ($^O eq 'linux') {
     *check_size = eval { require Linux::Smaps } && Linux::Smaps->new($$) ?
         \&_linux_smaps_size_check : \&_linux_size_check;
 }
+elsif ($^O eq 'netbsd') {
+    die "$PKG is not implemented on $^O.\n";
+}
 elsif ($^O =~ /(?:bsd|aix)/i) {
     # on OSX, getrusage() is returning 0 for proc & shared size.
     _load('BSD::Resource');
@@ -68,7 +71,7 @@ sub register {
 }
 
 # rss is in KB but ixrss is in BYTES.
-# This is true on at least FreeBSD, OpenBSD, & NetBSD
+# This is true on at least FreeBSD & OpenBSD
 sub _bsd_size_check {
     my @results = BSD::Resource::getrusage();
     my $max_rss   = $results[2];

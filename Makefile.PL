@@ -17,6 +17,9 @@ if ($^O eq 'solaris') {
 elsif ($^O eq 'linux') {
     $prereq->{'Linux::Smaps'} = 0 if -e '/proc/self/smaps';
 }
+elsif ($^O eq 'netbsd') {
+    die 'OS unsupported';
+}
 elsif ($^O =~ /(bsd|aix|darwin)/i) {
     $prereq->{'BSD::Resource'} = 0;
 }
