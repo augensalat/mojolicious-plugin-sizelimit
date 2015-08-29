@@ -43,8 +43,7 @@ ok !$stopped, "worker is alive";
 
 $t->get_ok('/')
     ->status_is(200)
-    ->content_is($$)
-    ->header_is(Connection => 'keep-alive');
+    ->content_is($$);
 
 ok !$stopped, "worker is alive";
 
