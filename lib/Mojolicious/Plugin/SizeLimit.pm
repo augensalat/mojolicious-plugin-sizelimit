@@ -5,7 +5,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 use Mojo::IOLoop;
 use Time::HiRes ();
 
-our $VERSION = '0.004';
+our $VERSION = '0.005';
 
 our $LifeTime;
 
@@ -210,7 +210,7 @@ Mojolicious::Plugin::SizeLimit - Terminate workers that grow too large
 
 =head1 VERSION
 
-Version 0.004
+Version 0.005
 
 =head1 SYNOPSIS
 
