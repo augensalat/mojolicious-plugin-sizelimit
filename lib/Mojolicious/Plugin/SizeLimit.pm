@@ -47,6 +47,8 @@ sub register {
     die "OS ($^O) not supported by $PKG: Can not determine memory usage.\n"
         unless $total;
 
+    $app->log->info(__PACKAGE__ . '::VERSION = ' . $VERSION);
+
     my %conf = %$conf;
 
     $conf{report_level} = 'debug' unless exists $conf->{report_level};
