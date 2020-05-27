@@ -15,7 +15,7 @@ use IO::Socket::INET;
 use Mojo::IOLoop::Server;
 use Mojo::Server::Hypnotoad;
 use Mojo::UserAgent;
-use Mojo::Util qw(slurp spurt);
+use Mojo::File;
 
 require Mojolicious::Plugin::SizeLimit;
 
@@ -34,8 +34,8 @@ plan skip_all => <<"" unless -e $hypnotoad;
 No hypnotoad found at $hypnotoad. Set TEST_HYPNOTOAD_PATH to correct path.
 
 my $dir = tempdir CLEANUP => 1;
-my $script = catdir $dir, 'myapp.pl';
-my $log    = catdir $dir, 'mojo.log';
+my $script = Mojo::File->new(catdir($dir),'myapp.pl');
+my $log    = Mojo::File->new(catdir($dir),'mojo.log');
 my $port   = Mojo::IOLoop::Server->generate_port;
 
 my $tmpl = <<EOF;
@@ -72,7 +72,7 @@ get '/size' => sub {
 app->start;
 EOF
 
-spurt sprintf($tmpl, ''), $script;
+$script->spurt(sprintf($tmpl, ''));
 
 # Start
 open my $start, '-|', $perl, $hypnotoad, $script;
@@ -132,7 +132,7 @@ else {
 }
 
 # Update script
-spurt sprintf($tmpl, "$p => $v, report_level => 'info'"), $script;
+$script->spurt(sprintf($tmpl, "$p => $v, report_level => 'info'"));
 
 open my $hot_deploy1, '-|', $perl, $hypnotoad, $script;
 
@@ -186,9 +186,7 @@ like $wpid3, qr/^\d+$/, 'right content';
 isnt $wpid3, $wpid2, 'worker pid changed again';
 
 # Update script again
-spurt sprintf($tmpl, "$p => $v, check_interval => 3, report_level => 'warn'"),
-      $script;
-
+$script->spurt(sprintf($tmpl, "$p => $v, check_interval => 3, report_level => 'warn'"));
 open my $hot_deploy2, '-|', $perl, $hypnotoad, $script;
 
 # Remove keep-alive connections
@@ -244,7 +242,7 @@ open my $stop, '-|', $perl, $hypnotoad, $script, '-s';
 sleep 1 while _port($port);
 
 # Check log
-$log = slurp $log;
+$log = $log->slurp;
 like $log, qr/
         Manager\s+$mpid1\s+started
         .+
