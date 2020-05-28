@@ -1,4 +1,4 @@
-use 5.010001;
+use 5.016;
 
 use strict;
 use warnings;
@@ -8,7 +8,7 @@ use ExtUtils::MakeMaker;
 
 my $eumm_version = version->parse($ExtUtils::MakeMaker::VERSION);
 my $prereq = {
-    'Mojolicious' => '5.80',
+    'Mojolicious' => '8.42',
 };
 
 if ($^O eq 'solaris') {
@@ -39,7 +39,7 @@ my @args = (
 if ($eumm_version >= 6.46) {
     push @args,
         META_MERGE     => {
-            requires   => {perl => '5.010001'},
+            requires   => {perl => '5.016'},
             resources  => {
                 license    => 'http://www.opensource.org/licenses/artistic-license-2.0',
                 bugtracker => 'https://github.com/augensalat/mojolicious-plugin-sizelimit/issues',
