@@ -39,10 +39,43 @@ else {
     die "$PKG is not implemented on $^O.\n";
 }
 
+sub startup_check {
+    my ($self,$app,$conf) = @_;
+    my ($size,$shared) = check_size($app->log);
+
+    # Skip the startup check if it wasn't enabled
+    return if !defined($conf->{startup_check}) || $conf->{startup_check} == 0;
+
+    $app->log->info(qq{
+Mojolicious::Plugin::SizeLimit version=$Mojolicious::Plugin::SizeLimit::VERSION loaded
+Parameters:
+    });
+
+    for my $conf_key (sort {$a cmp $b } keys %$conf) {
+        my $parameter_log_line = "$conf_key = $conf->{$conf_key}";
+        $app->log->info($parameter_log_line);
+    };
+
+    if(defined($conf->{min_process_size}) && $size < $conf->{min_process_size}) {
+        $app->log->info("min_process_size was not met during startup");
+        exit 1;
+    };
+
+    if(defined($conf->{max_process_size}) && $size > $conf->{max_process_size}) {
+        $app->log->info("max_process_size exceeded on startup");
+        exit 1;
+    };
+
+    if(defined($conf->{min_shared_size}) && $shared < $conf->{min_shared_size}) {
+        $app->log->info("max_process_size was not met during startup");
+        exit 1;
+    };
+}
 
 sub register {
     my ($self, $app, $conf) = @_;
     my ($total) = check_size($app->log);
+    $self->startup_check($app,$conf);
 
     die "OS ($^O) not supported by $PKG: Can not determine memory usage.\n"
         unless $total;
@@ -296,6 +329,12 @@ is acceptable, C<undef> disables the message. The default is C<"debug">.
 
 You might want to set C<report_level> at least to C<"info"> if you want
 this message in your production log.
+
+=head2 startup_check
+
+Will perform the checks at startup-time. If the memory conditions are not
+met, the application will shut down. This option can enable the startup
+check if it has the value 1.
 
 =head1 METHODS
 
