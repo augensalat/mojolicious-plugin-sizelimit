@@ -12,6 +12,6 @@ perl:
     - "5.12"
     - "5.10"
 before_script:
-    - "sudo cpanm --notest --installdeps ."
+    - "cpanm --notest --installdeps ."
 script:
     - "prove -v -Ilib t/"
