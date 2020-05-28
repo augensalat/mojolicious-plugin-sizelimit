@@ -10,9 +10,11 @@ perl:
     - "5.16"
     - "5.14"
     - "5.12"
+    - "5.10"
 before_script:
     - "echo TRAVIS_PERL_VERSION=$TRAVIS_PERL_VERSION"
-    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.12\" ]]; then echo \"[custom] installing Perl 5.12\"; perlbrew install perl-5.12.0 && perlbrew use 5.12.0; fi; "
+    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.12\" ]]; then echo \"[custom] installing Perl 5.12\"; perlbrew install -v -j 2 perl-5.12.0 && perlbrew use 5.12.0; fi; "
+    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.10\" ]]; then echo \"[custom] installing Perl 5.10\"; perlbrew install -v -j 2 perl-5.10.0 && perlbrew use 5.10.0; fi; "
     - "cpanm --notest --installdeps ."
 script:
     - "prove -v -Ilib t/"
