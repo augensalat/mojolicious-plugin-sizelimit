@@ -67,7 +67,7 @@ Parameters:
     };
 
     if(defined($conf->{min_shared_size}) && $shared < $conf->{min_shared_size}) {
-        $app->log->info("max_process_size was not met during startup");
+        $app->log->info("min_shared_size was not met during startup");
         exit 1;
     };
 }
