@@ -14,8 +14,8 @@ perl:
 before_script:
     - "echo TRAVIS_PERL_VERSION=$TRAVIS_PERL_VERSION"
     - "perlbrew install-patchperl -f"
-    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.12\" ]]; then echo \"[custom] installing Perl 5.12\"; perlbrew install -n -v -j 2 --switch perl-5.12.0; perlbrew install-cpanm -f; perl use 5.12.0; fi; "
-    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.10\" ]]; then echo \"[custom] installing Perl 5.10\"; perlbrew install -n -v -j 2 --switch perl-5.10.0; perlbrew install-cpanm -f; perl use 5.10.0; fi; "
+    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.12\" ]]; then echo \"[custom] installing Perl 5.12\"; perlbrew install -n -v -j 2 --switch perl-5.12.0; perlbrew install-cpanm -f; perlbrew use 5.12.0; fi; "
+    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.10\" ]]; then echo \"[custom] installing Perl 5.10\"; perlbrew install -n -v -j 2 --switch perl-5.10.0; perlbrew install-cpanm -f; perlbrew use 5.10.0; fi; "
     - "perl -v"
     - "cpanm --notest --installdeps ."
 script:
