@@ -12,7 +12,7 @@ perl:
     - "5.12"
 before_script:
     - "echo TRAVIS_PERL_VERSION=$TRAVIS_PERL_VERSION"
-    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.12\" ]]; then echo \"[custom] installing Perl 5.12\"; perl install perl-5.12.0 && perl use 5.12.0; fi; "
+    - "if [[ \"$TRAVIS_PERL_VERSION\" == \"5.12\" ]]; then echo \"[custom] installing Perl 5.12\"; perlbrew install perl-5.12.0 && perlbrew use 5.12.0; fi; "
     - "cpanm --notest --installdeps ."
 script:
     - "prove -v -Ilib t/"
