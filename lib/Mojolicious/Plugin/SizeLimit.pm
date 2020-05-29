@@ -7,7 +7,7 @@ use Time::HiRes ();
 
 our $VERSION = '0.005';
 
-our $LifeTime;
+our $start_timestamp;
 
 my $PKG = __PACKAGE__;
 
@@ -39,68 +39,46 @@ else {
     die "$PKG is not implemented on $^O.\n";
 }
 
-sub startup_check {
-    my ($self,$app,$conf) = @_;
-    my ($size,$shared) = check_size($app->log);
-
-    # Skip the startup check if it wasn't enabled
-    return if !defined($conf->{startup_check}) || $conf->{startup_check} == 0;
-
-    $app->log->info(qq{
-Mojolicious::Plugin::SizeLimit version=$Mojolicious::Plugin::SizeLimit::VERSION loaded
-Parameters:
-    });
-
-    for my $conf_key (sort {$a cmp $b } keys %$conf) {
-        my $parameter_log_line = "$conf_key = $conf->{$conf_key}";
-        $app->log->info($parameter_log_line);
-    };
-
-    if(defined($conf->{min_process_size}) && $size < $conf->{min_process_size}) {
-        $app->log->info("min_process_size was not met during startup");
-        exit 1;
-    };
-
-    if(defined($conf->{max_process_size}) && $size > $conf->{max_process_size}) {
-        $app->log->info("max_process_size exceeded on startup");
-        exit 1;
-    };
-
-    if(defined($conf->{min_shared_size}) && $shared < $conf->{min_shared_size}) {
-        $app->log->info("min_shared_size was not met during startup");
-        exit 1;
-    };
-}
-
 sub register {
     my ($self, $app, $conf) = @_;
     my ($total) = check_size($app->log);
-    $self->startup_check($app,$conf);
 
     die "OS ($^O) not supported by $PKG: Can not determine memory usage.\n"
         unless $total;
 
     $app->log->info(__PACKAGE__ . '::VERSION = ' . $VERSION);
 
+    # report_level needs a default value, we set it here
+    if(!exists($conf->{report_level})) {
+        $conf->{report_level}   = 'debug';
+    };
+
     my %conf = %$conf;
 
-    $conf{report_level} = 'debug' unless exists $conf->{report_level};
-
-    # ... a sub that is true every $check_interval requests
     *_count_requests = _make_count_requests(\%$conf);
-    # ... a sub that is true if memory consumption exceeds conf values
     *_limits_are_exceeded = _make_limits_are_exceeded(\%conf);
 
-    Mojo::IOLoop->singleton->next_tick(sub { $LifeTime = Time::HiRes::time })
+    if(defined($conf->{startup_check}) && $conf->{startup_check}) {
+        if(_limits_are_exceeded($app->log,$app,0)) {
+            $app->log->info("size limits failed at startup time, stopping");
+            Mojo::IOLoop->singleton->emit("sizelimit_shutdown");
+            Mojo::IOLoop->next_tick(sub { Mojo::IOLoop->singleton->stop_gracefully; });
+        };
+    };
+
+    Mojo::IOLoop->singleton->next_tick(sub { $start_timestamp = Time::HiRes::time })
         if $conf{report_level};
 
     $app->hook(after_dispatch => sub {
         my $c = shift;
-        my ($count, $check) = _count_requests();
-        $check and _limits_are_exceeded($c->app->log, $count)
-            or return;
-
+        my ($count, $is_check_applicable) = _count_requests();
+        if($is_check_applicable) {
+            return if !(_limits_are_exceeded($c->app->log,$app,$count));
+        } else {
+            return;
+        };
         $c->res->headers->connection('close');
+        Mojo::IOLoop->singleton->emit("sizelimit_shutdown");
         Mojo::IOLoop->singleton->stop_gracefully;
     });
 }
@@ -156,73 +134,65 @@ sub _load {
 
 sub _make_count_requests {
     my $conf = shift;
-
-    return sub { state $count = 0; return (++$count, 1) }
-        if ($conf->{check_interval} // 1) == 1;
-
-    return eval <<"_SUB_";
-        sub {
-            state \$count = 0;
-            return (\$count, ++\$count % $conf->{check_interval} == 0);
+    return sub {
+        state $count = 0;
+        my $check_interval = $conf->{check_interval} // 1;
+        my $is_check_applicable = 0;
+        if($check_interval == 1) {
+            ++$count;
+            $is_check_applicable = 1;
+        } else {
+            ++$count;
+            $is_check_applicable = (($count % $conf->{check_interval}) == 0);
         };
-_SUB_
+        return ($count,$is_check_applicable);
+    };
+}
+
+sub _report {
+    my ($size,$shared,$limit,$request_count) = @_;
+    my $unshared = $size - $shared;
+    my $now_timestamp = Time::HiRes::time;
+    my $lifetime = sprintf("%5.3f",($now_timestamp-$start_timestamp));
+    my $log_report = qq{
+SizeLimit: Exceeding limit $limit KB. PID = $$, SIZE = $size KB
+, SHARED = $shared KB, UNSHARED = $unshared KB
+, REQUESTS = $request_count, LIFETIME = $lifetime s
+};
+    $log_report =~ s{\n}{}g;
+    return $log_report;
 }
 
 sub _make_limits_are_exceeded {
-    my $conf = shift;
-    my $report = $conf->{report_level};
-    my ($f, $s);
+    my ($conf) = @_;
+    return sub {
+        my ($log,$app,$request_count) = @_;
+        my ($size,$shared) = check_size($app->log);
+        my $log_level = $conf->{report_level};
 
-    if ($report) {
-        $f = q{_report($log, $count, $size, $shared, '%s')};
-        eval <<"_SUB_";
-sub _report {
-    my (\$log, \$count, \$size, \$shared, \$s) = \@_;
-    my \$m = "SizeLimit: Exceeding limit \$s KB. PID = \$\$, SIZE = \$size KB";
-    \$m .= ", SHARED = \$shared KB, UNSHARED = " . (\$size - \$shared) . " KB"
-        if \$shared;
-    \$m .= sprintf ", REQUESTS = %u, LIFETIME = %5.3f s",
-                    \$count, Time::HiRes::time - \$LifeTime;
-    \$log->$report(\$m);
-    return 1;
-}
-_SUB_
-    }
-    else {
-        $f = '1';
-    }
+        if(defined($conf->{max_process_size}) && $size > $conf->{max_process_size}) {
+            my $limit = "max_process_size = $conf->{max_process_size}";
+            my $log_report = _report($size,$shared,$limit,$request_count);
+            $app->log->$log_level($log_report);
+            return 1;
+        };
 
-    my $sub = <<'_SUB_';
-sub {
-    my ($log, $count) = @_;
-    my ($size, $shared) = check_size($log);
-_SUB_
+        if(defined($conf->{min_shared_size}) && $shared < $conf->{min_shared_size}) {
+            my $limit = "min_shared_size = $conf->{min_shared_size}";
+            my $log_report = _report($size,$shared,$limit,$request_count);
+            $app->log->$log_level($log_report);
+            return 1;
+        };
 
-    if ($s = $conf->{max_process_size}) {
-        $sub .= '    return ' . sprintf($f, "max_process_size = $s") .
-                " if \$size > $s;\n";
-    }
+        if(defined($conf->{max_unshared_size}) && ($size-$shared) > $conf->{max_unshared_size}) {
+            my $limit = "max_unshared_size = $conf->{max_unshared_size}";
+            my $log_report = _report($size,$shared,$limit,$request_count);
+            $app->log->$log_level($log_report);
+            return 1;
+        };
 
-    $sub .= <<'_SUB_';
-    return 0 unless $shared;
-_SUB_
-
-    if ($s = $conf->{min_shared_size}) {
-        $sub .= '    return ' . sprintf($f, "min_shared_size = $s") .
-                " if \$shared < $s;\n";
-    }
-
-    if ($s = $conf->{max_unshared_size}) {
-        $sub .= '    return ' . sprintf($f, "max_unshared_size = $s") .
-                " if \$size - \$shared > $s;\n";
-    }
-
-    $sub .= <<'_SUB_';
-    return 0;
-};
-_SUB_
-
-    return eval $sub;
+        return 0;
+    };
 }
 
 sub _solaris_size_check {
@@ -355,6 +325,31 @@ Register plugin in L<Mojolicious> application.
 
 Returns a list with two memory sizes in KB, first to total process size
 and second the shared memory size. Not exported. Most usefull for tests.
+
+=head2  _make_count_requests
+
+This function is only intended to be called internally.
+
+It will generate another function that will count the requests made.
+This generated function will return a list with two integers
+(count,is_check_applicable).
+
+The first integer is the current request count for this process. The
+second integer indicates whether the our limit check should be performed
+on the current request.
+
+=head2 _make_limits_are_exceeded
+
+This function is only intended to be called internally.
+
+It will generate a function that will check if the limits given in the
+config are being met.
+
+The return value of the generated function will indicate if the limits
+are being met.
+
+If one of the limits is not met, this function will also build a report
+about the limits that were not met, and it will log that message.
 
 =head1 SEE ALSO
 
